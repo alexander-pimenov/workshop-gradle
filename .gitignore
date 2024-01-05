@@ -1,20 +1,53 @@
-# Ignore Gradle project-specific cache directory
+### Ignore Gradle project-specific cache directory ###
 .gradle
 
-# Ignore Gradle build output directory
+### Ignore Gradle build output directory ###
 build
 
-# Idea files
+### Idea files ###
 .idea
 *.iml
+*.iws
+*.ipr
 
-# Allure files and directories
+### Allure files and directories ###
 .allure
 target/
 
-# Compiled class file
+### Compiled class file ###
 *.class
 
-# Log file
+### Log file ###
 *.log
+logging/
+
+HELP.md
+
+### Ignore Maven project-specific cache directory ###
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
 
