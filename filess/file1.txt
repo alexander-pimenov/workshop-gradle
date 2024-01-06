@@ -1,0 +1,3 @@
+line-processing-by-plugin 1
+line-processing-by-plugin 2
+line-processing-by-plugin 3
