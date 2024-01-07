@@ -15,5 +15,12 @@ gradlePlugin {
             id = "workshop.java-plugin"
             implementationClass = "workshop.JavaPlugin"
         }
+
+        //дадим имя плагину
+        create("java-library-plugin") {
+            //дадим id плагину, и он важнее чем имя
+            id = "workshop.java-library-plugin"
+            implementationClass = "workshop.JavaLibraryPlugin"
+        }
     }
 }

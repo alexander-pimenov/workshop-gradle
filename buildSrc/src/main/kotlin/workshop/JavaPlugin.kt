@@ -9,8 +9,10 @@ import org.gradle.api.attributes.Category
 import org.gradle.api.attributes.LibraryElements
 import org.gradle.api.attributes.Usage
 import org.gradle.api.attributes.java.TargetJvmVersion
+import org.gradle.api.component.SoftwareComponentFactory
 import org.gradle.jvm.tasks.Jar
 import org.gradle.kotlin.dsl.named
+import javax.inject.Inject
 
 /*Удобная функция, чтобы инлайнить проперти.
 * Она позволяет вычислять дженерик исходя из сигнатуры функции
@@ -18,7 +20,15 @@ import org.gradle.kotlin.dsl.named
 * можно использвать её.*/
 inline fun <reified T : Named> Project.nameAttribute(value: String) = objects.named(T::class.java, value)
 
-class JavaPlugin : Plugin<Project> {
+//Что бы сделать компонент, который дальше будет использоваться для публикации, нужно
+// через конструктор заинжектить сервис для регистрации компонентов.
+//Почитать тут - https://docs.gradle.org/current/userguide/publishing_customization.html
+//SoftwareComponentFactory позволяет объявлять компонент.
+//Компонент - это кусочек софта, который описывает в себе всё: и нашизависимости, и артефакт,
+//и все варианты
+class JavaPlugin @Inject constructor(
+    private val softwareComponentFactory: SoftwareComponentFactory
+) : Plugin<Project> {
     override fun apply(project: Project) = with(project) {
         //что бы использовать другие библиотеки, например, Guava, нужно
         //научиться объявлять зависимости.
@@ -49,22 +59,22 @@ class JavaPlugin : Plugin<Project> {
         }
 
         //
-        val runtimeClasspath = configurations.create("runtimeClasspath"){
+        val classpath = configurations.create("classpath") {
             isCanBeConsumed = false
             isCanBeResolved = true
-            //всё что есть в implementation, должно попасть в runtimeClasspath
+            //всё что есть в implementation, должно попасть в classpath
             extendsFrom(implementation)
         }
 
 
-        //регистрируем таску для компиляции
-        //таску сконфигурировали в самой таске в блоке init{},
+        // регистрируем таску для компиляции
+        // таску сконфигурировали в самой таске в блоке init{},
         // а здесь в блоке {} сетим classpath
         val compileJava = tasks.register("compile", CompileJavaTask::class.java) {
             //передаем в classpath файлы из runtimeClasspath
-            //т.е. всё что влили в implementation попадет и в runtimeClasspath
+            //т.е. всё что влили в implementation попадет и в classpath
             //и попадает сюда в classPath
-            classPath.setFrom(runtimeClasspath)
+            classPath.setFrom(classpath)
         }
 
         //регистрируем таску для jar
@@ -123,6 +133,7 @@ class JavaPlugin : Plugin<Project> {
         }
 
         //предоставим Variant конфигурации для jar во время выполнения (runtimeElements)
+        //т.е. то что запускается в рантайме
         val runtimeElements = configurations.create("runtimeElements") {
             //в конфигурации важно описать два поля, для чего эта конфигурация используется
             //рекомендуется заполнять эти два поля:
@@ -191,6 +202,27 @@ class JavaPlugin : Plugin<Project> {
 //        configurations.named("default") {
 //            extendsFrom(runtimeElements)
 //        }
+
+        //Здесь создадим компонет, который нужен для публикации.
+        //Назовем его - java
+        val javaComponent = softwareComponentFactory.adhoc("java").apply {
+
+            //Добавим в javaComponent outgoingVariants из классов classes
+            addVariantsFromConfiguration(classes){
+                //Тут мы его объявляем, но не хотим публиковать в мавен
+                //Поэтому скипаем его.
+                skip()
+            }
+
+            //Добавим в javaComponent outgoingVariants из конфигурации runtimeElements
+            addVariantsFromConfiguration(runtimeElements){
+                //и хотим чтобы runtimeElements мапались на мавен скоуп runtime
+                mapToMavenScope("runtime")
+            }
+            //components.add(this)
+        }
+        //можно и так добавить копонент
+        components.add(javaComponent)
 
         Unit
     }
