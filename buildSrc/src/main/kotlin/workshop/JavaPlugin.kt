@@ -30,6 +30,11 @@ class JavaPlugin @Inject constructor(
     private val softwareComponentFactory: SoftwareComponentFactory
 ) : Plugin<Project> {
     override fun apply(project: Project) = with(project) {
+
+        //Настраиваем extension, чтобы наш плагин могли настраивать под себя другие.
+        //Из этого extension мы можем брать версию java
+        val javaExt = extensions.create("java", JavaPluginExtention::class.java)
+
         //что бы использовать другие библиотеки, например, Guava, нужно
         //научиться объявлять зависимости.
         //конфигурация зависимостей, которая позволит нам указать координаты каких то артефактов
@@ -127,7 +132,12 @@ class JavaPlugin @Inject constructor(
                 attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
                 attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
                 attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling.EXTERNAL))
-                attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, JavaVersion.current().majorVersion.toInt())
+                //тут заиспользуем для примера extension для версии java. Установим его после Evaluate
+                //что бы она засетилась после того как выполнится весь билдскрипт.
+                //Т.е. версию возьмем из javaExt
+                afterEvaluate { attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, javaExt.javaVersion.get()) }
+                //
+                //attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, JavaVersion.current().majorVersion.toInt())
                 attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))
             }
         }
@@ -174,7 +184,8 @@ class JavaPlugin @Inject constructor(
                 attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
                 attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
                 attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling.EXTERNAL))
-                attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, JavaVersion.current().majorVersion.toInt())
+                afterEvaluate { attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, javaExt.javaVersion.get()) }
+                //attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, JavaVersion.current().majorVersion.toInt())
                 attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.JAR))
             }
         }
@@ -208,14 +219,14 @@ class JavaPlugin @Inject constructor(
         val javaComponent = softwareComponentFactory.adhoc("java").apply {
 
             //Добавим в javaComponent outgoingVariants из классов classes
-            addVariantsFromConfiguration(classes){
+            addVariantsFromConfiguration(classes) {
                 //Тут мы его объявляем, но не хотим публиковать в мавен
                 //Поэтому скипаем его.
                 skip()
             }
 
             //Добавим в javaComponent outgoingVariants из конфигурации runtimeElements
-            addVariantsFromConfiguration(runtimeElements){
+            addVariantsFromConfiguration(runtimeElements) {
                 //и хотим чтобы runtimeElements мапались на мавен скоуп runtime
                 mapToMavenScope("runtime")
             }

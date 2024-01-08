@@ -30,7 +30,7 @@ gradle.taskGraph.afterTask {
 //После рефреша папка 'buildSrc' будет восприниматься Gradle, как еще один проект.
 
 //включим наши consumer и producer в проект, т.е. в нашу сборку
-include("consumer", "producer")
+include("consumer", "producer", "platform")
 
 //Так можно подключить все нужные зависимости для выполнения тасок:
 //например, Jackson, Guava и т.д.
@@ -45,3 +45,10 @@ buildscript {
 
     }
 }
+
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+    }
+}
+
