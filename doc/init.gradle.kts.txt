@@ -1,0 +1,81 @@
+//ПРИМЕР настройки init.gradle.kts, который лежит в директории пользователя `.gradle`
+//взят для примера в нём есть неточности.
+beforeSettings {
+    fun gradleProperty(name: String) = providers.gradleProperty(name).forUseAtConfigurationTime()
+    fun String.toDuration() = Pair(substringBefore(' ').toInt(), substringAfter(' ', "seconds"))
+
+    val sigmaUsername = gradleProperty("sigmaUsername").get()
+    val sigmaPassword = gradleProperty("sigmaPassword").get()
+
+    val mavenLocalEnabled = gradleProperty("mavenLocalEnabled").map { it.toBoolean() }.getOrElse(false)
+    val mavenSigmaProxyEnabled = gradleProperty("mavenSigmaProxyEnabled").map { it.toBoolean() }.getOrElse(false)
+
+    val cacheDynamic = gradleProperty("cacheDynamicVersionsFor").map { it.toDuration() }.orNull
+    val cacheChanching = gradleProperty("cacheChanchingModulesFor").map { it.toDuration() }.orNull
+
+    fun RepositoryContentDescriptor.excludeSberbankGroup() = excludeGroupByRegex("ru\\.sberbank\\..*")
+    fun ArtifactRepository.excludeSberbankGroup() = content { excludeSberbankGroup() }
+
+    // Improves build perfomance, fix configuration cache: https://github.com/gradle/gradle/issues/17563
+    fun RepositoryContentDescriptor.excludeUvzGradlePluginsDependencies() {
+        excludeGroupByRegex("ru\\.sberbank\\.uvz3\\.gradle\\..*")
+        excludeGroupByRegex("ru\\.sberbank\\.uvz3\\libs\\..*")
+        //excludeSberbankGroup("ru.sberbank.uvz3.libs")
+        excludeModule("ru.sberbank.uvz3", "uvz-platform")
+    }
+
+    fun RepositoryHandler.mavenSigma(name: String, action: MavenArtifactRepository.() -> Unit) =
+        maven("https://sigma.sbrf.ru/nexus/repositories/$name") {
+            credentials { username = sigmaUsername; password = sigmaPassword }
+            action()
+        }
+
+    fun RepositoryHandler.mavenExternalGradlePlugins() = gradlePluginPortal() { excludeSberbankGroup() }
+    fun RepositoryHandler.mavenExternalCentral() = mavenCentral() { excludeSberbankGroup() }
+    fun RepositoryHandler.mavenSigmaGradlePlugins() = mavenSigma("gradle_plugins_proxy") { excludeSberbankGroup() }
+    fun RepositoryHandler.mavenSigmaCentral() = mavenSigma("central") { excludeSberbankGroup() }
+    fun RepositoryHandler.mavenSigmaUvzRelease() = mavenSigma("AS_UVZ_release") { mavenContent { releasesOnly() } }
+    fun RepositoryHandler.mavenSigmaUvzSnapshot() = mavenSigma("AS_UVZ_snapshot") {
+        mavenContent { snapshotsOnly(); excludeUvzGradlePluginsDependencies() }
+    }
+
+    fun RepositoryHandler.mavenLocalResolved() {
+        if (mavenLocalEnabled) mavenLocal()
+    }
+
+    fun RepositoryHandler.mavenCentralResolved() =
+        if (mavenSigmaProxyEnabled) mavenSigmaCentral() else mavenExternalCentral()
+
+    fun RepositoryHandler.mavenGradlePluginsResolved() =
+        if (mavenSigmaProxyEnabled) mavenSigmaGradlePlugins() else mavenExternalGradlePlugins()
+
+    pluginManagement {
+        repositories {
+            mavenLocalResolved()
+            mavenGradlePluginsResolved()
+            mavenSigmaUvzRelease()
+            //mavenSigmaUvzSnapshot()
+        }
+    }
+
+    dependencyResolutionManagement {
+        repositories {
+            mavenLocalResolved()
+            mavenCentralResolved()
+            mavenGradlePluginsResolved()
+            mavenSigmaUvzRelease()
+            mavenSigmaUvzSnapshot()
+        }
+    }
+    fun Configuration.defaultResolutionStrategy() = resolutionStrategy {
+        cacheDynamic?.run { cacheDynamicVersionsFor(first, second) }
+        cacheChanching?.run { cacheChangingModulesFor(first, second) }
+    }
+
+    allprojects {
+        buildscript {
+            configurations.all { defaultResolutionStrategy() }
+        }
+        configurations.all { defaultResolutionStrategy() }
+    }
+}
